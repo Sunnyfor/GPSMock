@@ -1,0 +1,29 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# 各模块构建产物及 Kotlin 编译缓存，不属于工程源码。
+**/build/
+.kotlin/
+
+# IDE 本机配置保留在本地，避免提交设备与个人工作区信息。
+.idea/
+
+# 本地签名与环境凭据不进入远程仓库。
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example

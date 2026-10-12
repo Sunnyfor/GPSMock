@@ -1,0 +1,6 @@
+{
+  "basePackage": "com.sunnyfor.gpsmock",
+  "sourceRoots": ["app/src/main/java", "app/src/debug/java", "core/src/main/kotlin"],
+  "allowedFeaturePrefixes": ["com.sunnyfor.gpsmock.platform.ui"],
+  "pureLibraryPrefixes": ["kotlin", "java.math", "java.util"]
+}

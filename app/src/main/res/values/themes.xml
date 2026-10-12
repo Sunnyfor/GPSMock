@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Activity/窗口的基础宿主主题，不承担 Compose 配色、字号或设计密度缩放。 -->
+    <style name="Theme.GPSMock" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

@@ -1,0 +1,4 @@
+<resources>
+    <!-- 系统桌面及应用入口显示名称，不作为业务状态文案。 -->
+    <string name="app_name">GPSMock</string>
+</resources>
