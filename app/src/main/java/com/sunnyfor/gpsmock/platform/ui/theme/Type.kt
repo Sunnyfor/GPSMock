@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.sp
  * 本方案不固定用户 fontScale，适配容器内仍保留系统字体转换规则。
  */
 val AppTypography = Typography(
-    titleLarge = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Medium),
+    titleLarge = TextStyle(fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
     titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium),
     bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
     bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),

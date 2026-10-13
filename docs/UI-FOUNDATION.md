@@ -53,7 +53,7 @@ Material 默认尺寸仍使用逻辑 dp/sp，因此保持常规组件单位。
 
 ## 外观约定
 
-保留 Bidder 的品牌蓝 #3461FF、页面底色 #F6F8FC 和中性文字层级。
+首轮借鉴 Bidder 配色；2026-10-13 按审核通过的 A 原型更新品牌蓝为 #366BFA、冷白底色为 #F4F7FB、主要文字为 #1C2D48。
 组件使用 MaterialTheme.colorScheme 的语义角色，成功/提醒使用 LocalStatusColors。
 深浅配色分别配置，正文色与背景成对管理；自动测试检查静态主题的常规文字配对对比度 ≥ 4.5:1。
 壁纸动态色默认关闭，可显式启用。错误使用 Material error 角色。
@@ -91,6 +91,23 @@ $env:JAVA_HOME = 'D:\Program Files\Android\Android Studio\jbr'
 [Material 主题](https://developer.android.com/develop/ui/compose/designsystems/material3)、
 [触控区域](https://developer.android.com/develop/ui/compose/accessibility/api-defaults)、
 [文字对比度](https://developer.android.com/guide/topics/ui/accessibility/apps)。
+
+## A 方案原生实施（2026-10-13）
+
+用户在 A「地图优先」原型预览后确认“按照原型进行调整吧”。完整三版原型作为一手评审资料保存在本地草稿分支
+`prototype/location-assistant-ui-reviewed-20261013`，提交 `a8ba63d`；尚未推送。生产实现不包含 HTML 切换器、演示地图、样例收藏或模拟授权。
+
+- `feature.position.PositionPickerScreen` 保留生命周期观察、隐私门禁及真实地图槽位，展示由 `AtlasPositionScreen` 实现。
+- AS-IS 为一列滚动的会话/坐标/收藏/搜索卡片；TO-BE 为地图＋目标面板、固定主操作，以及「选点 / 常用 / 设置」三个目的地。
+- 手输与搜索使用可滚动对话框；手输校验成功或选中真实搜索结果后返回地图。收藏选用返回首页，新建/修改/删除仍使用原公开用例与二次确认。
+- 活动会话优先展示冻结目标；后续选择单独标为待选。所有目的地保留启动/停止/重试清理，清理未完成不能重新启动。
+- 通知权限仍只在用户点击启动时申请；模拟授权预检查、在线隐私及详细运行边界移入设置，不以 UI 状态替代真实引擎确认。
+- 浅色配色借鉴 A；深色沿用同布局，跟随系统。360 基准、系统字体偏好、安全区和地图系统密度边界保持不变；当前尺寸与浮层结构尚未完成 1:1 标定，不视为视觉还原验收通过。
+- 窄窗低高度采用有界地图与目标的整体滚动；低高度宽窗使用双栏、紧凑标题/底栏和横向地图提示。主操作始终在滚动区外；小空间省略首页细则但设置中保留说明。
+- 自绘矢量图标位于 `platform.ui.theme.AppGlyph`，无图片或新依赖。地图版权/Logo 保留独立可见区域，不被目标面板遮挡。
+- 收藏 BC、模拟 BC 的 contract/domain、数据库、服务组件与签名配置均未变；没有数据迁移或新增业务规则。
+
+验证结果及截图范围见 [验收清单](ACCEPTANCE.md)。
 
 ## UI 基础首轮验证结果（2026-10-12，地图接入前）
 

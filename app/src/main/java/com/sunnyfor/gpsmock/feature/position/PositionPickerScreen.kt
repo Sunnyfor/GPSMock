@@ -2,12 +2,14 @@ package com.sunnyfor.gpsmock.feature.position
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -24,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -32,14 +36,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.savedstate.SavedStateRegistryOwner
-import com.sunnyfor.gpsmock.platform.ui.adaptation.DesignScaledLayout
 import com.sunnyfor.gpsmock.platform.ui.adaptation.SystemDensityContent
-import com.sunnyfor.gpsmock.platform.ui.adaptation.WindowWidthClass
 import com.sunnyfor.gpsmock.platform.ui.mapui.AMapPickerMap
 import com.sunnyfor.gpsmock.platform.ui.mapui.MapCoordinateSystem
 import com.sunnyfor.gpsmock.platform.ui.mapui.OnlineMapGate
 import com.sunnyfor.gpsmock.platform.ui.theme.AppSpacing
-import java.util.Locale
+import com.sunnyfor.gpsmock.platform.ui.theme.AppGlyph
+import com.sunnyfor.gpsmock.platform.ui.theme.AppIcon
 
 /** 高德完整隐私政策的官方链接；简短页面说明不替代完整披露。 */
 private const val AMAP_PRIVACY_URL = "https://lbs.amap.com/pages/privacy/"
@@ -64,10 +67,11 @@ internal fun PositionPickerRoute(viewModel: PositionPickerViewModel, apiKey: Str
 }
 
 /**
- * 目标选择页面：窄窗口上下分区，宽窗口左右分区，主题只提供外观令牌。
+ * 地图优先的目标选择入口：界面重排与真实业务状态分离。
  *
  * 表单独立滚动，地图处于有界区域。大字体或键盘压缩空间时仍可滚动访问字段；
  * 待选目标保存在页面内存；收藏与会话反馈只来自公开用例，不自行假造成功。测试可注入无 SDK 的地图槽位。
+ *
  * @param state 不可变页面快照。
  * @param actions 状态意图接收方。
  * @param modifier 实际可用容器，不应放进无界滚动父级。
@@ -76,56 +80,46 @@ internal fun PositionPickerRoute(viewModel: PositionPickerViewModel, apiKey: Str
 @Composable
 internal fun PositionPickerScreen(state: PositionPickerState, actions: PositionPickerViewModel,
     modifier: Modifier = Modifier, mapContent: @Composable () -> Unit) {
-    DesignScaledLayout(modifier) { layout ->
-        Column(Modifier.fillMaxSize().padding(AppSpacing.large), verticalArrangement = Arrangement.spacedBy(AppSpacing.medium)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("定位助手", style = MaterialTheme.typography.headlineSmall)
-                    Text("固定位置 · 选择目标", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(state.session.phase.displayName(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            }
-            if (layout.widthClass == WindowWidthClass.Compact) {
-                MapRegion(state, actions, Modifier.weight(if (layout.isCompactHeight) 0.35f else 0.45f).fillMaxWidth(), mapContent)
-                PickerPanel(state, actions, Modifier.weight(0.55f).fillMaxWidth())
-            } else {
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.large)) {
-                    MapRegion(state, actions, Modifier.weight(1f).fillMaxSize(), mapContent)
-                    PickerPanel(state, actions, Modifier.width(320.dp).fillMaxSize())
-                }
-            }
-        }
-    }
+    AtlasPositionScreen(state, actions, modifier, mapContent)
     if (state.gate == OnlineMapGate.ConsentRequired) PrivacyDialog(actions)
     PositionBusinessDialogs(state, actions)
 }
 
 /** 根据门禁呈现真实地图或配置回退，保留 SDK 版权和 Logo，不用面板遮挡它们。 */
 @Composable
-private fun MapRegion(state: PositionPickerState, actions: PositionPickerViewModel,
+internal fun MapRegion(state: PositionPickerState, actions: PositionPickerViewModel,
     modifier: Modifier, mapContent: @Composable () -> Unit) {
-    Card(modifier) {
+    Card(modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = AppSpacing.medium), verticalAlignment = Alignment.CenterVertically) {
-                Text("地图选点 · GCJ-02", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                if (state.gate == OnlineMapGate.Ready) {
+            if (state.gate == OnlineMapGate.Ready) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = AppSpacing.medium), verticalAlignment = Alignment.CenterVertically) {
+                    Text("地图选点 · GCJ-02", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                     TextButton(onClick = actions::disableOnline) { Text("关闭在线") }
                 }
             }
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                val showDecoration = maxHeight >= 200.dp
+                val tight = maxHeight < 130.dp
+                val showHint = maxHeight >= 110.dp
                 if (state.gate == OnlineMapGate.Ready && state.mapError == null) mapContent()
-                else Column(Modifier.padding(AppSpacing.large).verticalScroll(rememberScrollState()),
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
-                    Text(when (state.gate) {
-                        OnlineMapGate.MissingKey -> "地图 Key 未配置"
-                        OnlineMapGate.Ready -> "地图暂不可用"
-                        else -> "在线地图未开启"
-                    }, style = MaterialTheme.typography.titleMedium)
+                else if (tight) Column(Modifier.padding(AppSpacing.small).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(AppSpacing.extraSmall)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
+                        Text(mapGateTitle(state), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                        if (state.gate == OnlineMapGate.Disabled) TextButton(actions::enableOnline) { Text("开启在线地图", style = MaterialTheme.typography.labelMedium) }
+                        else if (state.mapError != null) TextButton(onClick = { actions.disableOnline(); actions.enableOnline() }) { Text("重新尝试") }
+                    }
+                    if (showHint) Text("手输与常用位置仍可离线使用", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                else Column(Modifier.padding(AppSpacing.medium).verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(AppSpacing.extraSmall)) {
+                    if (showDecoration) AppIcon(AppGlyph.Pin, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text(mapGateTitle(state), style = MaterialTheme.typography.titleMedium)
                     Text(state.mapError ?: if (state.gate == OnlineMapGate.MissingKey) {
                         "在 local.properties 填写 AMAP_API_KEY 后重新构建。现在仍可手输坐标。"
-                    } else "开启后可点击地图选点、搜索地点和查询地址。", style = MaterialTheme.typography.bodySmall)
+                    } else "手输与常用位置仍可离线使用", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (state.gate == OnlineMapGate.Disabled) {
                         OutlinedButton(onClick = actions::enableOnline) { Text("开启在线地图") }
                     } else if (state.mapError != null) {
@@ -137,23 +131,22 @@ private fun MapRegion(state: PositionPickerState, actions: PositionPickerViewMod
     }
 }
 
-/** 独立滚动的手输、目标和真实搜索面板，窗口缩小时不挤压地图内部组件。 */
-@Composable
-private fun PickerPanel(state: PositionPickerState, actions: PositionPickerViewModel, modifier: Modifier) {
-    Column(modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(AppSpacing.medium)) {
-        SessionControlCard(state, actions)
-        if (state.selected != null) TargetCard(state)
-        ManualCoordinateCard(state, actions)
-        SavedPositionCard(state, actions)
-        SearchCard(state, actions)
-        Text("固定位置模拟仅用于本机测试，输出保留系统 mock 标记。收藏仅保存在本机；进程中断后不会自动重启模拟。",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+/** 地图门禁/错误的真实标题，不用“已开启”推断 SDK 已成功渲染。 */
+private fun mapGateTitle(state: PositionPickerState): String = when (state.gate) {
+    OnlineMapGate.MissingKey -> "地图 Key 未配置"
+    OnlineMapGate.Ready -> "地图暂不可用"
+    else -> "在线地图未开启"
 }
 
-/** 缺 Key、拒绝隐私或地图失败时仍可手输；字段顺序明确为纬度、经度。 */
+
+/**
+ * 缺 Key、拒绝隐私或地图失败时仍可手输；字段顺序明确为纬度、经度。
+ * 校验失败保留草稿与原目标，成功后才通知宿主关闭输入界面。
+ *
+ * @param onSelected 同步校验与选点成功后的 UI 回调，不代表已收藏或已启动。
+ */
 @Composable
-private fun ManualCoordinateCard(state: PositionPickerState, actions: PositionPickerViewModel) {
+internal fun ManualCoordinateCard(state: PositionPickerState, actions: PositionPickerViewModel, onSelected: () -> Unit = {}) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(AppSpacing.large), verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
             Text("手输坐标", style = MaterialTheme.typography.titleMedium)
@@ -175,36 +168,24 @@ private fun ManualCoordinateCard(state: PositionPickerState, actions: PositionPi
                     }
                 }
             }
-            Button(actions::submitManual, Modifier.fillMaxWidth()) { Text("使用此坐标") }
+            Button(onClick = {
+                actions.submitManual()
+                if (actions.state.value.latitudeError == null && actions.state.value.longitudeError == null) onSelected()
+            }, Modifier.fillMaxWidth()) { Text("使用此坐标") }
         }
     }
 }
 
-/** 展示原始目标及真实地址状态；地址失败不取消合法的坐标选择。 */
-@Composable
-private fun TargetCard(state: PositionPickerState) {
-    val target = state.selected ?: return
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(AppSpacing.large), verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
-            Text("已选目标", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            target.title?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-            Text("纬度 ${String.format(Locale.ROOT, "%.6f", target.coordinate.latitude)}")
-            Text("经度 ${String.format(Locale.ROOT, "%.6f", target.coordinate.longitude)}")
-            Text("${target.coordinate.system.displayName()} · ${when (target.source) {
-                PositionSource.Map -> "地图选点"
-                PositionSource.Search -> "搜索结果"
-                PositionSource.Manual -> "手输坐标"
-                PositionSource.Saved -> "常用位置"
-            }}", style = MaterialTheme.typography.labelLarge)
-            Text(target.address ?: state.addressMessage ?: "未查询地址；可开启在线地图查询。",
-                style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
 
-/** 只查询真实 POI；未同意或缺 Key 时显式禁用，不提供假候选。 */
+/**
+ * 只查询真实 POI；未同意或缺 Key 时显式禁用，不提供假候选。
+ *
+ * @param onPicked 选择候选后的 UI 返回回调，不执行收藏或启动。
+ * @param onEnableOnline 宿主先关闭搜索界面再进入隐私披露，避免叠加两个对话框。
+ */
 @Composable
-private fun SearchCard(state: PositionPickerState, actions: PositionPickerViewModel) {
+internal fun SearchCard(state: PositionPickerState, actions: PositionPickerViewModel, onPicked: () -> Unit = {},
+    onEnableOnline: () -> Unit = actions::enableOnline) {
     val online = state.gate == OnlineMapGate.Ready
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(AppSpacing.large), verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
@@ -217,10 +198,11 @@ private fun SearchCard(state: PositionPickerState, actions: PositionPickerViewMo
                 Text("查询地点")
             }
             if (!online) Text("配置 Key 并同意隐私说明后可用。", style = MaterialTheme.typography.bodySmall)
+            if (state.gate == OnlineMapGate.Disabled) TextButton(onEnableOnline) { Text("开启在线地图") }
             if (state.searching) CircularProgressIndicator(Modifier.width(24.dp))
             state.searchMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             state.places.forEach { place ->
-                OutlinedButton(onClick = { actions.pickPlace(place) }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { actions.pickPlace(place); onPicked() }, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth()) {
                         Text(place.title)
                         if (place.address.isNotBlank()) Text(place.address, style = MaterialTheme.typography.bodySmall)

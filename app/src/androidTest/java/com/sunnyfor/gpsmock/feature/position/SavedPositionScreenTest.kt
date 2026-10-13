@@ -63,9 +63,11 @@ class SavedPositionScreenTest {
     @Test fun savesEditsAndConfirmsDeletion() {
         val model = PositionPickerViewModel(NoQueriesForSavedTest(), false, catalog)
         content(model)
+        compose.onNodeWithText("手输坐标").performClick()
         compose.onNodeWithText("纬度").performScrollTo().performTextInput("0")
         compose.onNodeWithText("经度").performScrollTo().performTextInput("0")
         compose.onNodeWithText("使用此坐标").performScrollTo().performClick()
+        compose.onNodeWithText("常用").performClick()
         compose.onNodeWithText("收藏当前目标").performScrollTo().performClick()
         compose.onNodeWithText("名称（1–30 字）").performTextInput("测试收藏")
         compose.onNodeWithText("保存收藏").performClick()
@@ -88,6 +90,7 @@ class SavedPositionScreenTest {
         val sessions = SessionUiTestPort()
         val model = PositionPickerViewModel(NoQueriesForSavedTest(), false, catalog, sessions)
         content(model)
+        compose.onNodeWithText("常用").performClick()
         compose.waitUntil(5_000) { model.state.value.savedPositions.size == 1 }
         compose.onNodeWithText("删除全部收藏").performScrollTo().assertIsNotEnabled()
         compose.runOnIdle { sessions.state.value = SessionView(SessionPhase.Idle) }

@@ -5,15 +5,15 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 /**
- * 静态浅色 Material 配色，沿用 Bidder 的品牌蓝与中性底色并补全成对前景色。
+ * 审核通过的地图优先方案浅色配色：品牌蓝、冷白底色与深蓝灰文字。
  *
  * 组件按 primary/surface 等语义取色，不将固定色值分散到业务页面。
  * 主要文字色对由主题对比度测试约束；状态色引用 [LightStatusColors]。
  */
 internal val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF3461FF),
+    primary = Color(0xFF366BFA),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFEAEFFF),
+    primaryContainer = Color(0xFFEDF3FF),
     onPrimaryContainer = Color(0xFF173A9E),
     secondary = Color(0xFF4E5969),
     onSecondary = Color.White,
@@ -23,26 +23,26 @@ internal val LightColorScheme = lightColorScheme(
     onTertiary = Color.White,
     tertiaryContainer = LightStatusColors.successContainer,
     onTertiaryContainer = LightStatusColors.onSuccessContainer,
-    background = Color(0xFFF6F8FC),
-    onBackground = Color(0xFF1D2129),
+    background = Color(0xFFF4F7FB),
+    onBackground = Color(0xFF1C2D48),
     surface = Color.White,
-    onSurface = Color(0xFF1D2129),
+    onSurface = Color(0xFF1C2D48),
     surfaceVariant = Color(0xFFE7EDF6),
     onSurfaceVariant = Color(0xFF4E5969),
     surfaceDim = Color(0xFFE7EDF6),
     surfaceBright = Color.White,
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = Color(0xFFF6F8FC),
+    surfaceContainerLow = Color(0xFFF4F7FB),
     surfaceContainer = Color(0xFFF2F4F9),
     surfaceContainerHigh = Color(0xFFE7EDF6),
     surfaceContainerHighest = Color(0xFFE5E6EB),
-    surfaceTint = Color(0xFF3461FF),
+    surfaceTint = Color(0xFF366BFA),
     inverseSurface = Color(0xFF1D2129),
     inverseOnSurface = Color(0xFFF6F8FC),
     inversePrimary = Color(0xFFB6C4FF),
     outline = Color(0xFF737D8C),
-    outlineVariant = Color(0xFFE5E6EB),
-    error = Color(0xFFB3261E),
+    outlineVariant = Color(0xFFE9EDF4),
+    error = Color(0xFFC33F49),
     onError = Color.White,
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
