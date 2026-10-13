@@ -94,8 +94,8 @@ $env:JAVA_HOME = 'D:\Program Files\Android\Android Studio\jbr'
 
 ## A 方案原生实施（2026-10-13）
 
-用户在 A「地图优先」原型预览后确认“按照原型进行调整吧”。完整三版原型作为一手评审资料保存在本地草稿分支
-`prototype/location-assistant-ui-reviewed-20261013`，提交 `a8ba63d`；尚未推送。生产实现不包含 HTML 切换器、演示地图、样例收藏或模拟授权。
+用户在 A「地图优先」原型预览后确认“按照原型进行调整吧”。按用户后续要求，本地原型草稿分支已移除；HTML 评审文件仅保留在本机未跟踪目录，不纳入主分支提交。
+本次清理不改写正式代码提交、不操作远程、不删除本地原型文件。生产实现不包含 HTML 切换器、演示地图、样例收藏或模拟授权。
 
 - `feature.position.PositionPickerScreen` 保留生命周期观察、隐私门禁及真实地图槽位，展示由 `AtlasPositionScreen` 实现。
 - AS-IS 为一列滚动的会话/坐标/收藏/搜索卡片；TO-BE 为地图＋目标面板、固定主操作，以及「选点 / 常用 / 设置」三个目的地。
