@@ -1,5 +1,10 @@
 # 定位助手领域层
 
+> 本文下方保留领域搭建与改名时的阶段记录，并非最新功能缺失清单。
+> 2026-10-12 已接通公开契约、应用协调器、SQLite 收藏/收据、会话日志、Android 引擎与前台服务。
+> 最新实现边界见 [上下文地图](CONTEXT-MAP.md)，设备结果与待验项见 [验收清单](ACCEPTANCE.md)。
+> core 的 domain 仍无框架/I/O 依赖；contract/application 使用 kotlinx-coroutines-core 1.9.0。
+
 本次根据 `location-assistant-handoff-20261010.zip` 的 HANDOFF、DOMAIN-MODEL、CONTEXT-MAP 与
 REQUIREMENTS 创建可编译的纯 Kotlin 领域层。以交接时 android-ddd 1.4.0 为目录与命名基准。
 旧资料中的 `:business` 模块和 `.business.` 前缀不继续使用；当前结构为 `:app → :core`。

@@ -5,61 +5,37 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.material3.MaterialTheme
-import com.sunnyfor.gpsmock.platform.ui.adaptation.DesignScaledLayout
+import androidx.lifecycle.ViewModelProvider
+import com.sunnyfor.gpsmock.feature.position.PositionPickerRoute
+import com.sunnyfor.gpsmock.feature.position.PositionPickerViewModel
 import com.sunnyfor.gpsmock.platform.ui.theme.GPSMockTheme
+import com.sunnyfor.gpsmock.wiring.PositionPickerFactory
+import com.sunnyfor.gpsmock.wiring.readAMapKey
 
 /**
- * 应用的 Compose 入口，装配外观主题、系统边距与局部设计密度。
+ * 定位助手入口，装配主题、安全区、Activity 作用域选点状态与地图宿主。
  *
- * 当前仍展示模板问候内容，尚未接入收藏或模拟会话业务页面。
+ * 通过公开能力装配收藏与模拟操作；在线地图仍保留独立 SDK 隐私门禁。
  */
 class MainActivity : ComponentActivity() {
-    /** 启用边到边显示，先应用 Scaffold 安全边距，再对可用内容区域进行设计缩放。 */
+    /** 恢复宿主后读取 Key 并装配页面；系统安全区和键盘边距先于设计缩放。 */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val apiKey = readAMapKey(applicationContext)
+        val picker = ViewModelProvider(this, PositionPickerFactory(applicationContext, apiKey))
+            .get(PositionPickerViewModel::class.java)
         setContent {
             GPSMockTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    DesignScaledLayout(Modifier.fillMaxSize().padding(innerPadding)) {
-                        Greeting(name = "Android")
-                    }
+                    PositionPickerRoute(picker, apiKey, this,
+                        Modifier.fillMaxSize().padding(innerPadding).imePadding())
                 }
             }
-        }
-    }
-}
-
-/**
- * 模板问候组件，用于验证主题文字样式；不表示模拟定位状态。
- *
- * @param name 显示在问候语中的名称，不执行业务校验。
- * @param modifier 调用方提供的布局或语义修饰。
- */
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier,
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onBackground
-    )
-}
-
-/** 在 360 逻辑宽度的预览中展示入口占位内容。 */
-@Preview(showBackground = true, widthDp = 360, heightDp = 800)
-@Composable
-fun GreetingPreview() {
-    GPSMockTheme {
-        DesignScaledLayout(Modifier.fillMaxSize()) {
-            Greeting("Android")
         }
     }
 }

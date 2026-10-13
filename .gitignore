@@ -24,6 +24,9 @@ local.properties
 # 本地签名与环境凭据不进入远程仓库。
 *.jks
 *.keystore
+# 本项目签名文件没有扩展名，须单独排除；密码配置同样仅保留在本地。
+/sunnyfor
+/keystore.properties
 .env
 .env.*
 !.env.example

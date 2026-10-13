@@ -2,9 +2,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 当前保留模板的备份开关与规则；尚未制定业务数据的备份/恢复策略。 -->
+    <!-- 在线能力只需网络；模拟写入不读取真实位置，不申请真实定位、电话或外部存储权限。 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 开发者选项按此声明筛选候选应用；它不是可申请的运行时授权，实际授权必须由用户在设置中选择。 -->
+    <uses-permission
+        android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation,ProtectedPermissions" />
+    <!-- 用户主动启动的纯模拟测试服务；不冒用读取真实位置的 location 类型。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- 收藏、会话线索及资源账本均不进入云备份或设备迁移。 -->
     <application
-        android:allowBackup="true"
+        android:name=".wiring.GpsMockApplication"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -12,6 +26,19 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.GPSMock">
+        <!-- 只由本应用或不可变通知启动；不接收开机广播，不自动重启运行。 -->
+        <service
+            android:name=".locationgrp.mocksessionbc.adapter.android.MockLocationForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-initiated fixed mock location injection for testing. No real location access. Runs until user stops and cleans up owned test providers." />
+        </service>
+        <!-- 默认替换为空字符串；填写 local.properties 的 AMAP_API_KEY 后重新构建。 -->
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="${AMAP_API_KEY}" />
         <!-- 启动 Activity 使用 XML 宿主主题；Compose 内容外观由 GPSMockTheme 提供。 -->
         <activity
             android:name=".MainActivity"

@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     本应用 targetSdk >= 31，在 Android 12 及以上使用的数据提取规则。
-    当前未配置 include/exclude 或独立设备迁移段，沿用平台默认范围，并非禁止备份/迁移。
+    云备份和设备迁移均排除私有数据；不能把历史模拟资源迁移到另一设备。
     与 backup_rules.xml 的业务数据策略应保持一致；恢复会话不能直接恢复为运行中。
     规则来源：https://developer.android.com/identity/data/autobackup
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- 云备份的业务数据包含/排除范围尚未配置。 -->
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
     </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
 </data-extraction-rules>

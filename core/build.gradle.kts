@@ -18,6 +18,8 @@ kotlin {
 }
 
 dependencies {
+    // 仅供 contract/application 使用；领域聚合仍不依赖协程框架。
+    implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit)
 }
 
