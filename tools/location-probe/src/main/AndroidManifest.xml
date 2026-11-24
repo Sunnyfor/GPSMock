@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 仅前台设备验收读取公开定位接口；由用户确认运行时权限，不借用 shell 身份。 -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <application android:label="定位接收端测试" android:allowBackup="false">
+        <!-- 普通可启动的测试页面；只说明用途与申请权限，不接收外部坐标或操作主应用会话。 -->
+        <activity android:name=".ReceiverObservationActivity" android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

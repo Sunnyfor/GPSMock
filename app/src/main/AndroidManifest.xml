@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 在线能力只需网络；模拟写入不读取真实位置，不申请真实定位、电话或外部存储权限。 -->
+    <!-- 网络用于地图和搜索。 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 供获得用户授权的前台设备定位和模拟期间的 GPS 订阅使用。 -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- 开发者选项按此声明筛选候选应用；它不是可申请的运行时授权，实际授权必须由用户在设置中选择。 -->
     <uses-permission
         android:name="android.permission.ACCESS_MOCK_LOCATION"

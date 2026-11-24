@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- 仅 Debug 的本机验收入口；DUMP 为系统签名/调试权限，普通应用不能调用。 -->
+        <receiver
+            android:name=".locationgrp.mocksessionbc.adapter.android.MockSessionDiagnosticReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+    </application>
+</manifest>
