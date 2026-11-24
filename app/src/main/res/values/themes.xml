@@ -2,5 +2,9 @@
 <resources>
 
     <!-- Activity/窗口的基础宿主主题，不承担 Compose 配色、字号或设计密度缩放。 -->
-    <style name="Theme.GPSMock" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.GPSMock" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- 启动窗口与 Compose 中性白一致，系统安全区不另绘辅助容器色。 -->
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>

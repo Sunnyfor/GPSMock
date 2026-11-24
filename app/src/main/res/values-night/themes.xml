@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色启动窗口与主题 surface 同色；原生系统图标由 Activity 按实际外观同步。 -->
+    <style name="Theme.GPSMock" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#131720</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

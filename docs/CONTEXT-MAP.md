@@ -5,6 +5,10 @@
 BC 内部领域层仍使用 `domain` package，业务 owner 与领域模型不变。
 locationgrp 仅组织目录，不拥有公共业务对象或状态。
 
+2026-10-14 增加仅设备验收的 `:location-probe`（`tools/location-probe`）：独立 UID/进程的
+自插桩接收端，不是生产业务模块，不被 app/core 依赖，不读取主应用数据库或领域对象。
+生产依赖方向仍为 `:app → :core`；模拟引擎扩展在既有 mocksessionbc Android Adapter 内。
+
 | 上下文 | 唯一 owner | 当前实现 | 对外能力 |
 | --- | --- | --- | --- |
 | 常用位置 | com.sunnyfor.gpsmock.locationgrp.placecatalogbc | 聚合、应用协调器、SQLite 原子事务及命令收据 | PositionCatalog：保存、编辑、删除、清空、列表、按 ID/revision 解析 |
@@ -26,6 +30,10 @@ SDK MapView、POI 与地址查询归属 `platform.ui.mapui`；UI/SDK 中转坐�
 Key、隐私门禁与验收说明见 [UI 基础与地图接入](UI-FOUNDATION.md)、[验收清单](ACCEPTANCE.md)。
 
 运行中的目标是会话自己的冻结值。收藏编辑/删除与会话不需要跨 BC 事务。
+
+2026-10-14 设备位置居中和版本化授权均属于 app 的 UI 平台能力，不新增 BC。
+`feature.position` 组合地图、收藏和模拟旅程；`platform.ui.mapui` 提供一次系统定位及相机意图，
+`platform.ui.privacy` 保存本机用途选择，`wiring` 装配适配器。设备位置不是业务目标，不进入 core。
 新启动遇 CleanupRequired 必须由应用协调器拒绝；唯一活动槽位同样属于协调器责任。
 
 详情：[领域模型](DOMAIN-MODEL.md)、

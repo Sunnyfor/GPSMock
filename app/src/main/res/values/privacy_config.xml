@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 正式发布前搜索 PRIVACY_PLACEHOLDER 并替换；集中配置，不在源码分散复制。 -->
+    <string name="privacy_developer_name">[待填写：开发者个人或公司名称]</string>
+    <string name="privacy_contact_email">[待填写：公开联系邮箱]</string>
+</resources>

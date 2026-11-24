@@ -7,7 +7,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.SideEffect
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import com.sunnyfor.gpsmock.feature.position.PositionPickerRoute
@@ -31,9 +36,17 @@ class MainActivity : ComponentActivity() {
             .get(PositionPickerViewModel::class.java)
         setContent {
             GPSMockTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                val dark = isSystemInDarkTheme()
+                SideEffect {
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !dark
+                        isAppearanceLightNavigationBars = !dark
+                    }
+                }
+                // 系统安全区与标题使用同一个 surface，移除 Scaffold 默认容器色的拼接。
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                     PositionPickerRoute(picker, apiKey, this,
-                        Modifier.fillMaxSize().padding(innerPadding).imePadding())
+                        Modifier.fillMaxSize().safeDrawingPadding().imePadding())
                 }
             }
         }

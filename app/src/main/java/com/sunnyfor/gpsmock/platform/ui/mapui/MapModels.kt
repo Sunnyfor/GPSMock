@@ -68,6 +68,9 @@ internal sealed interface MapQueryResult<out T> {
  * 页面负责忽略过期结果，不能以忽略回调宣称请求未曾发送。
  */
 internal interface MapQueryClient {
+    /** 已初始化后撤回 SDK 查询授权；默认无资源的替身无需操作，不承诺撤销已发出的请求。 */
+    fun revokePrivacy() = Unit
+
     /**
      * 按关键词和可选城市查询真实 POI，最多返回十条。
      * @param query 已由页面检查为非空的地点或地址关键词。
@@ -92,7 +95,7 @@ internal enum class OnlineMapGate {
     /** 用户尚未开启在线地图，或已关闭页面的在线功能。 */
     Disabled,
 
-    /** 用户要求开启，但尚未明确同意本次会话的隐私说明。 */
+    /** 用户要求开启，但没有覆盖当前告知版本的明确同意。 */
     ConsentRequired,
 
     /** 已配置且明确同意，允许尝试初始化真实 SDK。 */

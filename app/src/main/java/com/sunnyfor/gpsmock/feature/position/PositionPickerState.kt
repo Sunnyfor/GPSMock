@@ -4,6 +4,7 @@ import com.sunnyfor.gpsmock.platform.ui.mapui.MapCoordinate
 import com.sunnyfor.gpsmock.platform.ui.mapui.MapCoordinateSystem
 import com.sunnyfor.gpsmock.platform.ui.mapui.MapPlace
 import com.sunnyfor.gpsmock.platform.ui.mapui.OnlineMapGate
+import com.sunnyfor.gpsmock.platform.ui.mapui.MapCameraRequest
 import com.sunnyfor.gpsmock.locationgrp.placecatalogbc.contract.SavedPosition
 import com.sunnyfor.gpsmock.locationgrp.mocksessionbc.contract.SessionView
 import com.sunnyfor.gpsmock.locationgrp.mocksessionbc.contract.SessionPhase
@@ -84,6 +85,33 @@ internal fun validateCoordinateInput(
 internal data class PositionPickerState(
     /** 在线功能门禁；Ready 不意味着 Key 已通过在线鉴权。 */
     val gate: OnlineMapGate,
+
+    /** 首次打开或版本过期需展示 App 隐私说明，独立于地图 Key 是否存在。 */
+    val privacyRequired: Boolean = false,
+
+    /** 授权记录正在落盘时禁止重复选择，不提前初始化 SDK。 */
+    val privacySaving: Boolean = false,
+
+    /** 持久授权读写失败提示；null 表示无失败，不自动忽略保存错误。 */
+    val privacyError: String? = null,
+
+    /** 当前版本的地图/搜索同意是否有效，与在线开关分开。 */
+    val mapConsentAccepted: Boolean = false,
+
+    /** 是否单独同意设备定位用途，不代替系统运行时权限。 */
+    val deviceConsentAccepted: Boolean = false,
+
+    /** 用户已明确同意或拒绝设备定位用途；拒绝后不在后续冷启动强制重问。 */
+    val deviceConsentDecided: Boolean = false,
+
+    /** 一次设备定位进行中；关闭在线、后台或模拟启动会取消。 */
+    val locating: Boolean = false,
+
+    /** 定位成功、拒绝、超时或模拟来源的安全提示，不显示设备坐标。 */
+    val deviceLocationMessage: String? = null,
+
+    /** 仅用于移动相机的新请求；不代表 selected 目标或模拟会话。 */
+    val cameraRequest: MapCameraRequest? = null,
 
     /** 地图初始化或绘制失败提示；存在时用清晰回退替代地图。 */
     val mapError: String? = null,

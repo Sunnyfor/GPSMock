@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.sunnyfor.gpsmock.feature.position.PositionPickerViewModel
 import com.sunnyfor.gpsmock.platform.ui.mapui.AMapQueryAdapter
+import com.sunnyfor.gpsmock.platform.ui.mapui.AndroidDeviceLocationAdapter
+import com.sunnyfor.gpsmock.platform.ui.privacy.AndroidPrivacyConsentStore
 
 /** 从合并后的 Manifest 读取构建时 Key；空值按未配置处理，不输出凭据。 */
 internal fun readAMapKey(context: Context): String = context.packageManager
@@ -29,6 +31,7 @@ internal class PositionPickerFactory(
         require(modelClass == PositionPickerViewModel::class.java)
         val application = context.applicationContext as GpsMockApplication
         return modelClass.cast(PositionPickerViewModel(AMapQueryAdapter(context, apiKey), apiKey.isNotBlank(),
-            application.catalog, application.session))!!
+            application.catalog, application.session, AndroidPrivacyConsentStore(context),
+            AndroidDeviceLocationAdapter(context.applicationContext)))!!
     }
 }

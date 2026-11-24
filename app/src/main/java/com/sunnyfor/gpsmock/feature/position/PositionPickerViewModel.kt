@@ -14,6 +14,14 @@ import com.sunnyfor.gpsmock.locationgrp.placecatalogbc.contract.CatalogMutation
 import com.sunnyfor.gpsmock.locationgrp.placecatalogbc.contract.PositionCatalog
 import com.sunnyfor.gpsmock.locationgrp.placecatalogbc.contract.SavedPosition
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
+import com.sunnyfor.gpsmock.platform.ui.mapui.DeviceLocationClient
+import com.sunnyfor.gpsmock.platform.ui.mapui.DeviceLocationResult
+import com.sunnyfor.gpsmock.platform.ui.mapui.MapCameraRequest
+import com.sunnyfor.gpsmock.platform.ui.privacy.PrivacyConsentRecord
+import com.sunnyfor.gpsmock.platform.ui.privacy.PrivacyConsentStore
 import java.util.UUID
 import com.sunnyfor.gpsmock.platform.ui.mapui.MapCoordinate
 import com.sunnyfor.gpsmock.platform.ui.mapui.MapCoordinateSystem
@@ -30,8 +38,8 @@ import kotlinx.coroutines.flow.update
  * 跨 BC 的选点、收藏与模拟旅程状态协调器，只调用公开契约，不直接操作领域聚合。
  *
  * ## 状态规则
- * Key 与本次会话的明确隐私同意同时满足后才允许在线请求；默认关闭在线功能。
- * 配置变更由 Activity ViewModel 保留状态；进程退出后不恢复页面待选目标或隐私同意。
+ * Key 与当前版本有效隐私同意同时满足后才允许在线请求；明确同意记录可在本机恢复。
+ * 配置变更由 Activity ViewModel 保留状态；进程退出后不恢复待选目标或自动启动模拟。
  * 所有方法和查询回调在主线程串行执行。每次新意图使用独立令牌，过期回调无效；
  * 关闭在线功能无法撤销已经发送的请求，不宣称 SDK 后台完全停止采集。
  */
@@ -46,13 +54,31 @@ internal class PositionPickerViewModel(
     private val catalog: PositionCatalog? = null,
 
     /** Application 唯一会话公开能力，不随 Activity ViewModel 销毁。 */
-    private val sessions: MockSession? = null
-) : ViewModel() {
-    /** 是否要求开启在线地图；缺 Key 时不能改变为开启。 */
-    private var onlineEnabled = false
+    private val sessions: MockSession? = null,
 
-    /** 本次 Activity 会话内的明确隐私同意；不写入备份或长期持久化。 */
-    private var consent = false
+    /** 本机版本化授权存储；纯选点测试可省略，生产由 wiring 提供。 */
+    private val privacyStore: PrivacyConsentStore? = null,
+
+    /** 前台一次性设备定位端口；缺省时不获取任何设备位置。 */
+    private val deviceLocation: DeviceLocationClient? = null
+) : ViewModel() {
+    /** 仅读取匹配当前告知版本的记录；旧版不迁移为新功能的授权。 */
+    private val privacyRecord = privacyStore?.read()?.takeIf { it.isCurrent() }
+
+    /** 是否要求开启在线地图；缺 Key 时不能改变为开启。 */
+    private var onlineEnabled = privacyRecord?.mapAccepted == true
+
+    /** 当前告知版本的地图同意；拒绝或撤回后立即关闭 SDK 门禁。 */
+    private var consent = privacyRecord?.mapAccepted == true
+
+    /** 当前一次定位任务；新请求、选点、后台、关闭在线及模拟启动均使它失效。 */
+    private var locationJob: Job? = null
+
+    /** 本轮页面是否尝试自动居中，防止重组、重返前台反复抢占用户视野。 */
+    private var automaticLocationAttempted = false
+
+    /** 相机请求的页面内递增身份，相同坐标再次居中也产生新意图。 */
+    private var cameraSequence = 0L
 
     /** 当前搜索请求身份；修改输入、关闭地图或销毁时置空。 */
     private var searchToken: Any? = null
@@ -74,14 +100,21 @@ internal class PositionPickerViewModel(
 
     /** 内部可写快照，外部只能读取。 */
     private val mutableState = MutableStateFlow(PositionPickerState(
-        gate = resolveOnlineMapGate(keyConfigured, enabled = false, consent = false)
+        gate = resolveOnlineMapGate(keyConfigured, onlineEnabled, consent),
+        privacyRequired = privacyStore != null && privacyRecord == null,
+        mapConsentAccepted = consent,
+        deviceConsentAccepted = privacyRecord?.deviceAccepted == true,
+        deviceConsentDecided = privacyRecord?.deviceDecided == true
     ))
 
     /** 提供 Compose 观察的只读状态流。 */
     val state = mutableState.asStateFlow()
 
     init {
-        sessions?.let { port -> viewModelScope.launch { port.state.collect { view -> mutableState.update { it.copy(session = view) } } } }
+        sessions?.let { port -> viewModelScope.launch { port.state.collect { view ->
+            if (view.phase != SessionPhase.Idle) cancelDeviceLocation()
+            mutableState.update { it.copy(session = view) }
+        } } }
         if (catalog != null) reloadSaved()
     }
 
@@ -89,6 +122,7 @@ internal class PositionPickerViewModel(
     fun startSimulation() {
         val selected = state.value.selected ?: return
         val port = sessions ?: return
+        cancelDeviceLocation()
         val target = if (selected.savedId != null && selected.savedRevision != null) StartTarget.Saved(selected.savedId, selected.savedRevision)
         else StartTarget.Inline(SessionCoordinate(selected.coordinate.latitude, selected.coordinate.longitude,
             SessionCoordinateSystem.valueOf(selected.coordinate.system.name)), selected.title.orEmpty())
@@ -240,16 +274,104 @@ internal class PositionPickerViewModel(
         if (consent) requestAddress()
     }
 
-    /** 接受已经展示的隐私说明；非同意等待状态下的事件无效。 */
+    /** 接受已展示的当前隐私说明；先确认记录落盘，再释放在线门禁。 */
     fun acceptPrivacy() {
-        if (state.value.gate != OnlineMapGate.ConsentRequired || disposed) return
-        consent = true
-        refreshGate()
-        requestAddress()
+        if ((!state.value.privacyRequired && state.value.gate != OnlineMapGate.ConsentRequired) || disposed || state.value.privacySaving) return
+        savePrivacy(PrivacyConsentRecord(mapAccepted = true)) {
+            consent = true
+            onlineEnabled = true
+            mutableState.update { it.copy(privacyRequired = false, mapConsentAccepted = true) }
+            refreshGate()
+            requestAddress()
+        }
     }
 
-    /** 关闭在线功能并丢弃未完成结果；保留本次会话已经明确给出的同意。 */
+    /** 拒绝并记录当前版本的明确选择，后续冷启动不反复强迫；主动开启仍可重新同意。 */
+    fun rejectPrivacy() {
+        if (state.value.privacySaving || disposed) return
+        consent = false
+        disableOnline()
+        val sdkError = try { client.revokePrivacy(); null } catch (_: RuntimeException) {
+            "SDK 授权状态更新失败，在线门禁已关闭；请退出应用后重新打开。"
+        }
+        mutableState.update { it.copy(privacyRequired = false, mapConsentAccepted = false, deviceConsentAccepted = false, deviceConsentDecided = true) }
+        savePrivacy(PrivacyConsentRecord(deviceDecided = true)) {
+            if (sdkError != null) mutableState.update { it.copy(privacyError = sdkError) }
+        }
+    }
+
+    /** 撤回地图与设备定位用途同意，先关闭门禁并取消请求，不影响本地收藏及运行中的模拟停止。 */
+    fun revokePrivacy() = rejectPrivacy()
+
+    /** 单独记录设备定位用途同意；只有地图授权有效时接受，不自行申请系统权限或获取位置。 */
+    fun acceptDeviceLocationConsent() {
+        if (!consent || state.value.privacySaving || disposed) return
+        savePrivacy(PrivacyConsentRecord(mapAccepted = true, deviceAccepted = true, deviceDecided = true)) {
+            mutableState.update { it.copy(deviceConsentAccepted = true, deviceConsentDecided = true) }
+        }
+    }
+
+    /** 记录仅使用地图、不读取设备位置的选择；保留地图同意，后续只有主动点击定位才重新询问。 */
+    fun rejectDeviceLocationConsent() {
+        if (!consent || state.value.privacySaving || disposed) return
+        cancelDeviceLocation()
+        mutableState.update { it.copy(deviceConsentAccepted = false, deviceConsentDecided = true) }
+        savePrivacy(PrivacyConsentRecord(mapAccepted = true, deviceDecided = true)) {}
+    }
+
+    /** 持久化失败保持当前门禁关闭或旧状态；撤回已在内存生效，提示用户重试以避免重启恢复旧记录。 */
+    private fun savePrivacy(record: PrivacyConsentRecord, onSaved: () -> Unit) {
+        val store = privacyStore
+        if (store == null) { onSaved(); return }
+        mutableState.update { it.copy(privacySaving = true, privacyError = null) }
+        viewModelScope.launch {
+            val saved = store.write(record)
+            if (disposed) return@launch
+            mutableState.update { it.copy(privacySaving = false, privacyError = if (saved) null else
+                "授权选择未能保存，请检查存储空间并重试；撤回失败时重启可能恢复旧记录。") }
+            if (saved) onSaved()
+        }
+    }
+
+    /** 在完整用途授权及在线门禁满足后尝试一次定位；自动尝试不会覆盖已有选点。 */
+    fun locateDevice(automatic: Boolean = false) {
+        val current = state.value
+        val port = deviceLocation ?: return
+        if (disposed || current.gate != OnlineMapGate.Ready || !current.deviceConsentAccepted || current.locating) return
+        if (current.session.phase != SessionPhase.Idle) {
+            locationPermissionMessage("模拟会话未结束，暂不获取设备位置。")
+            return
+        }
+        if (automatic && (automaticLocationAttempted || current.selected != null)) return
+        automaticLocationAttempted = true
+        cancelDeviceLocation()
+        mutableState.update { it.copy(locating = true, deviceLocationMessage = "正在定位…") }
+        locationJob = viewModelScope.launch {
+            val result = port.locate()
+            coroutineContext.ensureActive()
+            if (disposed || state.value.gate != OnlineMapGate.Ready || state.value.session.phase != SessionPhase.Idle) return@launch
+            mutableState.update { when (result) {
+                is DeviceLocationResult.Located -> it.copy(locating = false,
+                    cameraRequest = MapCameraRequest(++cameraSequence, result.coordinate, if (result.accuracyMeters > 500) 12f else 16f),
+                    deviceLocationMessage = if (result.accuracyMeters > 500) "大致设备位置已居中" else "设备位置已居中")
+                is DeviceLocationResult.Unavailable -> it.copy(locating = false, deviceLocationMessage = result.message)
+            } }
+        }
+    }
+
+    /** 显示权限或用途恢复提示，不修改已选目标或会话事实。 */
+    fun locationPermissionMessage(message: String) { mutableState.update { it.copy(deviceLocationMessage = message) } }
+
+    /** 后台或业务意图到来时取消一次定位，并清除相机请求；不停止用户主动运行的模拟。 */
+    fun cancelDeviceLocation() {
+        locationJob?.cancel()
+        locationJob = null
+        mutableState.update { it.copy(locating = false, cameraRequest = null, deviceLocationMessage = null) }
+    }
+
+    /** 关闭在线功能并丢弃未完成结果；保留当前版本同意，关闭不等同于撤回。 */
     fun disableOnline() {
+        cancelDeviceLocation()
         onlineEnabled = false
         searchToken = null
         addressToken = null
@@ -301,6 +423,7 @@ internal class PositionPickerViewModel(
     /** 替换目标并取消旧地址结果的应用；搜索候选本身保持可继续选择。 */
     private fun select(target: SelectedPosition) {
         if (disposed) return
+        cancelDeviceLocation()
         addressToken = null
         mutableState.update { it.copy(selected = target, addressMessage = null) }
         if (target.address == null) requestAddress()
@@ -363,6 +486,7 @@ internal class PositionPickerViewModel(
 
     /** ViewModel 销毁后清空令牌；不再应用仍由 SDK 完成的回调。 */
     override fun onCleared() {
+        cancelDeviceLocation()
         disposed = true
         catalogToken = null
         searchToken = null

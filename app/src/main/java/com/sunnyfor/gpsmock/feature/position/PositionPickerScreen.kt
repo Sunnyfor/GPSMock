@@ -27,6 +27,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,12 +71,68 @@ private const val AMAP_PRIVACY_URL = "https://lbs.amap.com/pages/privacy/"
 internal fun PositionPickerRoute(viewModel: PositionPickerViewModel, apiKey: String,
     owner: SavedStateRegistryOwner, modifier: Modifier = Modifier) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    PositionPickerScreen(state, viewModel, modifier) {
-        SystemDensityContent {
-            AMapPickerMap(apiKey, owner, state.selected?.coordinate, viewModel::pickMap,
-                viewModel::mapFailed, Modifier.fillMaxSize())
+    val context = LocalContext.current
+    var deviceDisclosure by rememberSaveable { mutableStateOf(false) }
+    var automaticAttempted by rememberSaveable { mutableStateOf(false) }
+    var permissionAfterConsent by rememberSaveable { mutableStateOf(false) }
+    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        if (grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true || grants[Manifest.permission.ACCESS_FINE_LOCATION] == true) viewModel.locateDevice()
+        else viewModel.locationPermissionMessage("未授权定位，仍可搜索、选点或手输；可在系统应用设置中授权后重试。")
+    }
+    val locate = {
+        val current = viewModel.state.value
+        when {
+            current.session.phase != com.sunnyfor.gpsmock.locationgrp.mocksessionbc.contract.SessionPhase.Idle ->
+                viewModel.locationPermissionMessage("模拟会话未结束，暂不获取设备位置。")
+            current.gate != OnlineMapGate.Ready -> viewModel.enableOnline()
+            !current.deviceConsentAccepted -> deviceDisclosure = true
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED -> viewModel.locateDevice()
+            else -> permissions.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
         }
     }
+    LaunchedEffect(state.gate, state.deviceConsentAccepted) {
+        if (state.gate == OnlineMapGate.Ready && state.deviceConsentAccepted && permissionAfterConsent) {
+            permissionAfterConsent = false
+            automaticAttempted = true
+            locate()
+        } else if (state.gate == OnlineMapGate.Ready && !automaticAttempted && state.selected == null &&
+            state.session.phase == com.sunnyfor.gpsmock.locationgrp.mocksessionbc.contract.SessionPhase.Idle) {
+            // 未授权时用途告知先于权限弹窗；拒绝后本页面不反复索取。
+            if (!state.deviceConsentAccepted && !state.deviceConsentDecided) deviceDisclosure = true
+            else {
+                automaticAttempted = true
+                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                if (granted && state.deviceConsentAccepted) viewModel.locateDevice(automatic = true)
+                else viewModel.locationPermissionMessage("设备定位未启用；点击定位按钮可继续授权，仍可直接选点。")
+            }
+        }
+    }
+    DisposableEffect(owner) {
+        val lifecycle = (owner as androidx.lifecycle.LifecycleOwner).lifecycle
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) viewModel.cancelDeviceLocation() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); viewModel.cancelDeviceLocation() }
+    }
+    PositionPickerScreen(state, viewModel, modifier, onLocate = locate) {
+        SystemDensityContent {
+            AMapPickerMap(apiKey, owner, state.selected?.coordinate, viewModel::pickMap,
+                viewModel::mapFailed, Modifier.fillMaxSize(), state.cameraRequest)
+        }
+    }
+    if (deviceDisclosure && state.gate == OnlineMapGate.Ready) AlertDialog(
+        onDismissRequest = { if (!state.privacySaving) { deviceDisclosure = false; automaticAttempted = true; viewModel.rejectDeviceLocationConsent() } },
+        title = { Text("让地图从你身边开始") },
+        text = { Text("读取一次系统设备位置，仅用于地图居中，不自动选择目标或启动模拟。地图视图及相关状态/缓存由高德 SDK 处理；不将设备位置写入本机收藏或授权记录，不建立后台轨迹。可仅授予大致位置，拒绝后仍能选点、搜索和手输。用途同意不替代系统定位权限。") },
+        confirmButton = { TextButton(onClick = {
+            deviceDisclosure = false
+            permissionAfterConsent = true
+            viewModel.acceptDeviceLocationConsent()
+        }, enabled = !state.privacySaving) { Text("同意并继续") } },
+        dismissButton = { TextButton(onClick = { deviceDisclosure = false; automaticAttempted = true; viewModel.rejectDeviceLocationConsent() },
+            enabled = !state.privacySaving) { Text("直接选点") } }
+    )
 }
 
 /**
@@ -79,9 +148,9 @@ internal fun PositionPickerRoute(viewModel: PositionPickerViewModel, apiKey: Str
  */
 @Composable
 internal fun PositionPickerScreen(state: PositionPickerState, actions: PositionPickerViewModel,
-    modifier: Modifier = Modifier, mapContent: @Composable () -> Unit) {
-    AtlasPositionScreen(state, actions, modifier, mapContent)
-    if (state.gate == OnlineMapGate.ConsentRequired) PrivacyDialog(actions)
+    modifier: Modifier = Modifier, onLocate: () -> Unit = {}, mapContent: @Composable () -> Unit) {
+    CanvasPositionScreen(state, actions, modifier, mapContent, onLocate)
+    if (state.privacyRequired || state.gate == OnlineMapGate.ConsentRequired) PrivacyDialog(state, actions)
     PositionBusinessDialogs(state, actions)
 }
 
@@ -89,14 +158,8 @@ internal fun PositionPickerScreen(state: PositionPickerState, actions: PositionP
 @Composable
 internal fun MapRegion(state: PositionPickerState, actions: PositionPickerViewModel,
     modifier: Modifier, mapContent: @Composable () -> Unit) {
-    Card(modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+    androidx.compose.material3.Surface(modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(Modifier.fillMaxSize()) {
-            if (state.gate == OnlineMapGate.Ready) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = AppSpacing.medium), verticalAlignment = Alignment.CenterVertically) {
-                    Text("地图选点 · GCJ-02", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                    TextButton(onClick = actions::disableOnline) { Text("关闭在线") }
-                }
-            }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 val showDecoration = maxHeight >= 200.dp
                 val tight = maxHeight < 130.dp
@@ -213,22 +276,57 @@ internal fun SearchCard(state: PositionPickerState, actions: PositionPickerViewM
     }
 }
 
-/** 展示供应方、用途和数据处理说明，只有明确点击同意才释放 SDK 门禁。 */
+/**
+ * 紧凑首次确认只呈现用途摘要与阅读入口；完整政策在独立阅读层展开，不挤占首页。
+ *
+ * 阅读、返回及关闭阅读层都不等于同意；实际确认仍先保存当前版本记录，再释放 SDK 门禁。
+ * 大字体或低窗口下文本区域可滚动，操作按钮由 AlertDialog 独立测量。
+ */
 @Composable
-private fun PrivacyDialog(actions: PositionPickerViewModel) {
+private fun PrivacyDialog(state: PositionPickerState, actions: PositionPickerViewModel) {
     val uriHandler = LocalUriHandler.current
+    var reading by rememberSaveable { mutableStateOf(false) }
+    if (reading) {
+        PrivacyNoticeReader { reading = false }
+        return
+    }
     AlertDialog(
-        onDismissRequest = actions::disableOnline,
-        title = { Text("启用高德在线服务") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(AppSpacing.medium)) {
-                Text("地图、地点搜索和地址查询由北京高德图强科技有限公司提供。开启后，查询关键词、城市、所选坐标会发送给高德；SDK 还可能处理网络地址、设备及应用信息，详情请阅读完整隐私政策。")
-                Text("本应用不读取设备实时位置，不申请真实定位权限。同意仅保留在本次会话；拒绝后仍可手输和管理收藏。关闭在线功能会释放地图并忽略旧结果，但不能撤销已发出的请求。")
-                TextButton(onClick = { uriHandler.openUri(AMAP_PRIVACY_URL) }) { Text("阅读高德完整隐私政策") }
+        onDismissRequest = { if (!state.privacySaving) actions.rejectPrivacy() },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        icon = {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    AppIcon(AppGlyph.Pin, Modifier.size(26.dp))
+                }
             }
         },
-        confirmButton = { TextButton(actions::acceptPrivacy) { Text("同意并开启") } },
-        dismissButton = { TextButton(actions::disableOnline) { Text("暂不开启") } }
+        title = { Text("欢迎使用定位助手", style = MaterialTheme.typography.titleLarge) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("在线地图与搜索由北京高德图强科技有限公司提供，会处理查询内容、所选坐标及相关设备与网络信息。",
+                    style = MaterialTheme.typography.bodyMedium)
+                Text("设备定位另行征求同意与系统权限，仅用于地图居中；拒绝在线授权仍可手输、收藏及模拟。",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { reading = true }) { Text("隐私与使用说明", style = MaterialTheme.typography.labelMedium) }
+                    TextButton(onClick = { uriHandler.openUri(AMAP_PRIVACY_URL) }) { Text("高德隐私政策", style = MaterialTheme.typography.labelMedium) }
+                }
+                state.privacyError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Button(onClick = actions::acceptPrivacy, enabled = !state.privacySaving,
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text(if (state.privacySaving) "正在保存…" else "同意并开启")
+                }
+                TextButton(onClick = actions::rejectPrivacy, enabled = !state.privacySaving,
+                    modifier = Modifier.fillMaxWidth()) { Text("暂不开启", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
     )
 }
 

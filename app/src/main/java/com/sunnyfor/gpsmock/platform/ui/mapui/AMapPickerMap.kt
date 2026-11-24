@@ -31,6 +31,7 @@ import java.io.File
  * @param onPick 真正点击地图后返回的 GCJ-02 坐标。
  * @param onFailure 初始化、绘制或生命周期操作异常的安全提示。
  * @param modifier 地图实际分配区域；建议在 SystemDensityContent 内使用。
+ * @param cameraRequest 一次设备位置居中意图；与目标选择独立，不显示设备坐标或创建目标。
  */
 @Composable
 internal fun AMapPickerMap(
@@ -39,14 +40,15 @@ internal fun AMapPickerMap(
     selected: MapCoordinate?,
     onPick: (MapCoordinate) -> Unit,
     onFailure: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cameraRequest: MapCameraRequest? = null
 ) {
     AndroidView(
         factory = { context -> AMapSurface(context, apiKey, owner, onPick, onFailure) },
         modifier = modifier,
         onReset = null,
         onRelease = { it.close() },
-        update = { it.update(selected, onPick, onFailure) }
+        update = { it.update(selected, onPick, onFailure); it.centerDevice(cameraRequest) }
     )
 }
 
@@ -88,6 +90,9 @@ private class AMapSurface(
     /** 最近绘制的原坐标；重组不重复移动相机，也不改写该坐标系。 */
     private var drawnCoordinate: MapCoordinate? = null
 
+    /** 最近消费的居中请求身份；普通重组不能反复移动用户已拖动的地图。 */
+    private var centeredSequence: Long? = null
+
     /** 已注册状态保存提供器，保证关闭时只注销自己的注册。 */
     private var stateRegistered = false
 
@@ -114,10 +119,10 @@ private class AMapSurface(
             view.onCreate(restored)
             addView(view, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
             view.map.apply {
-                // 不启用“我的位置”，不申请设备定位权限；默认视野不是已选目标。
+                // 设备定位由系统一次性适配器承担，不启用 SDK 持续定位或蓝点跟踪。
                 isMyLocationEnabled = false
                 uiSettings.isMyLocationButtonEnabled = false
-                uiSettings.isZoomControlsEnabled = true
+                uiSettings.isZoomControlsEnabled = false
                 setOnMapClickListener { point ->
                     pickCallback(MapCoordinate(point.latitude, point.longitude, MapCoordinateSystem.GCJ02))
                 }
@@ -160,6 +165,19 @@ private class AMapSurface(
         }
     }
 
+    /** 仅移动相机，不创建目标标记或触发选点；WGS-84 转换值不回写设备坐标。 */
+    fun centerDevice(request: MapCameraRequest?) {
+        if (request == null || centeredSequence == request.sequence) return
+        safely {
+            val map = mapView?.map ?: return@safely
+            val point = request.coordinate
+            val displayed = CoordinateConverter(context).from(CoordinateConverter.CoordType.GPS)
+                .coord(LatLng(point.latitude, point.longitude)).convert()
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(displayed, request.zoom))
+            centeredSequence = request.sequence
+        }
+    }
+
     /** Activity 恢复后激活地图；生命周期已恢复时注册观察者也会收到该事件。 */
     override fun onResume(owner: LifecycleOwner) = lifecycle.resume()
 
@@ -178,6 +196,8 @@ private class AMapSurface(
         }
         marker = null
         lifecycle.close()
+        // 宿主已释放后同步关闭地图 SDK 的合规状态；再次创建仍须通过上层有效授权。
+        safely { MapsInitializer.updatePrivacyAgree(context, false) }
         removeAllViews()
     }
 

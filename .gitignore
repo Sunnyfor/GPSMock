@@ -17,6 +17,10 @@ local.properties
 # 各模块构建产物及 Kotlin 编译缓存，不属于工程源码。
 **/build/
 .kotlin/
+/app/release/
+
+# 用户确认的设计原型只在本地审核，不进入后续提交。
+/docs/prototypes/
 
 # IDE 本机配置保留在本地，避免提交设备与个人工作区信息。
 .idea/

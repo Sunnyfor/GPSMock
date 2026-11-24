@@ -31,6 +31,16 @@ internal class AMapQueryAdapter(
     /** 把 SDK 结果统一交付到页面主线程。 */
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /** 是否已实际报告查询服务同意；未初始化前撤回不得触碰 SDK。 */
+    private var prepared = false
+
+    /** 同步撤回查询 SDK 合规状态；已有异步请求不可撤销，页面令牌负责拒绝迟到结果。 */
+    override fun revokePrivacy() {
+        if (!prepared) return
+        try { ServiceSettings.updatePrivacyAgree(context, false) }
+        finally { prepared = false }
+    }
+
     /** 查询第一页 POI，并过滤没有有效经纬度的数据；不补造搜索结果。 */
     override fun search(query: String, city: String, callback: (MapQueryResult<List<MapPlace>>) -> Unit) {
         execute(callback) {
@@ -92,6 +102,7 @@ internal class AMapQueryAdapter(
         check(apiKey.isNotBlank())
         ServiceSettings.updatePrivacyShow(context, true, true)
         ServiceSettings.updatePrivacyAgree(context, true)
+        prepared = true
         ServiceSettings.getInstance().apply {
             setApiKey(apiKey)
             setProtocol(ServiceSettings.HTTPS)

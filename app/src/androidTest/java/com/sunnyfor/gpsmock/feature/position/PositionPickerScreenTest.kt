@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -42,7 +44,7 @@ class PositionPickerScreenTest {
     /** 管理 UI 线程、组合生命周期与控件交互的测试规则。 */
     @get:Rule val compose = createComposeRule()
 
-    /** 280dp 低窗口采用整页内容滚动，手输入口可达且主操作保持在窗口内。 */
+    /** 280dp 低窗口摘要可滚动，固定手输入口可达且主操作保持在窗口内。 */
     @Test
     fun shortWindowScrollsContentWithoutHidingPrimaryAction() {
         val model = PositionPickerViewModel(NoOnlineQueries(), false)
@@ -52,11 +54,11 @@ class PositionPickerScreenTest {
                 PositionPickerScreen(state, model, Modifier.fillMaxWidth().height(280.dp)) { error("Unexpected map") }
             }
         }
-        compose.onNodeWithText("启动固定位置模拟").assertIsDisplayed()
-        compose.onNodeWithText("手输坐标").performScrollTo().performClick()
+        compose.onNodeWithText("开始模拟").assertIsDisplayed()
+        compose.onNodeWithText("输入坐标").performClick()
         compose.onNodeWithText("纬度").assertExists()
         compose.onNodeWithText("返回地图").performClick()
-        compose.onNodeWithText("启动固定位置模拟").assertIsDisplayed()
+        compose.onNodeWithText("开始模拟").assertIsDisplayed()
     }
 
     /** 两倍系统字体下仍能打开手输并提交零点，固定主操作不藏进滚动区。 */
@@ -70,12 +72,12 @@ class PositionPickerScreenTest {
                 GPSMockTheme(darkTheme = false) { PositionPickerScreen(state, model, Modifier.fillMaxSize()) { error("Unexpected map") } }
             }
         }
-        compose.onNodeWithText("启动固定位置模拟").assertIsDisplayed().assertIsNotEnabled()
-        compose.onNodeWithText("手输坐标").performScrollTo().performClick()
+        compose.onNodeWithText("开始模拟").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithText("输入坐标").performClick()
         compose.onNodeWithText("纬度").performScrollTo().performTextInput("0")
         compose.onNodeWithText("经度").performScrollTo().performTextInput("0")
         compose.onNodeWithText("使用此坐标").performScrollTo().performClick()
-        compose.onNodeWithText("启动固定位置模拟").assertIsDisplayed()
+        compose.onNodeWithText("开始模拟").assertIsDisplayed()
         compose.runOnIdle { assertEquals(0.0, model.state.value.selected!!.coordinate.latitude, 0.0) }
     }
 
@@ -91,17 +93,19 @@ class PositionPickerScreenTest {
             PositionPickerScreen(state, model, Modifier.fillMaxSize()) { error("Unexpected map") }
         } }
         compose.onNodeWithText("冻结零点").assertIsDisplayed()
+        compose.onNodeWithContentDescription("查看目标详情").performClick()
         compose.onNodeWithText("纬度 0.000000").assertExists()
+        compose.onNodeWithText("返回地图").performClick()
         compose.onNodeWithText("停止模拟").assertIsDisplayed()
-        compose.onNodeWithText("常用").performClick()
+        compose.onNodeWithText("常用位置").performClick()
         compose.onNodeWithText("停止模拟").assertIsDisplayed()
-        compose.onNodeWithText("设置").performClick()
-        compose.onNodeWithText("停止模拟").assertIsDisplayed()
+        compose.onNodeWithContentDescription("打开设置").performClick()
+        compose.onAllNodesWithText("停止模拟")[1].assertIsDisplayed()
         compose.runOnIdle { state = state.copy(session = SessionView(SessionPhase.CleanupRequired)) }
-        compose.onNodeWithText("重试清理").assertIsDisplayed()
-        compose.onNodeWithText("启动固定位置模拟").assertDoesNotExist()
+        compose.onAllNodesWithText("重试清理")[1].assertIsDisplayed()
+        compose.onNodeWithText("开始模拟").assertDoesNotExist()
         compose.runOnIdle { state = state.copy(selected = null, session = SessionView(SessionPhase.Idle)) }
-        compose.onNodeWithText("启动固定位置模拟").assertIsNotEnabled()
+        compose.onNodeWithText("开始模拟").assertIsNotEnabled()
     }
 
     /** 空 Key 显示明确提示且不组合 SDK 槽位，仍能输入并选择零点目标。 */
@@ -116,11 +120,12 @@ class PositionPickerScreenTest {
             }
         }
         compose.onNodeWithText("地图 Key 未配置").assertExists()
-        compose.onNodeWithText("手输坐标").performClick()
+        compose.onNodeWithText("输入坐标").performClick()
         compose.onNodeWithText("纬度").performScrollTo().performTextInput("0")
         compose.onNodeWithText("经度").performScrollTo().performTextInput("0")
         compose.onNodeWithText("使用此坐标").performScrollTo().performClick()
         compose.onNodeWithText("已选目标").assertIsDisplayed()
+        compose.onNodeWithContentDescription("查看目标详情").performClick()
         compose.onNodeWithText("纬度 0.000000").assertExists()
         compose.runOnIdle { assertEquals(0, mapCompositions) }
     }
@@ -140,13 +145,14 @@ class PositionPickerScreenTest {
             }
         }
         compose.onNodeWithText("开启在线地图").performScrollTo().performClick()
-        compose.onNodeWithText("启用高德在线服务").assertExists()
+        compose.onNodeWithText("欢迎使用定位助手").assertExists()
         compose.onNodeWithText("暂不开启").performClick()
         compose.runOnIdle { assertEquals(0, mapCompositions) }
         compose.onNodeWithText("开启在线地图").performScrollTo().performClick()
         compose.onNodeWithText("同意并开启").performClick()
         compose.onNodeWithText("测试地图槽位").assertExists()
         compose.runOnIdle { assertTrue(mapCompositions > 0) }
+        compose.onNodeWithContentDescription("打开设置").performClick()
         compose.onNodeWithText("关闭在线").performClick()
         compose.onNodeWithText("开启在线地图").assertExists()
     }

@@ -40,7 +40,19 @@ internal enum class AppGlyph {
     Play,
 
     /** 停止动作。 */
-    Stop
+    Stop,
+
+    /** 设备位置居中，不表示模拟目标。 */
+    Locate,
+
+    /** 目标详情及更多操作。 */
+    More,
+
+    /** 返回主地图画布。 */
+    Back,
+
+    /** 搜索入口的前进指示。 */
+    Arrow
 }
 
 /** 绘制统一线宽的代码原生图标；可访问名称由外层按钮承担，独立使用时传入 description。 */
@@ -88,6 +100,18 @@ internal fun AppIcon(glyph: AppGlyph, modifier: Modifier = Modifier, tint: Color
                     path.moveTo(7f, 3f); path.lineTo(21f, 12f); path.lineTo(7f, 21f); path.close(); drawPath(path, tint)
                 }
                 AppGlyph.Stop -> drawRoundRect(tint, Offset(5f, 5f), Size(14f, 14f), androidx.compose.ui.geometry.CornerRadius(2f))
+                AppGlyph.Locate -> {
+                    drawCircle(tint, 7f, Offset(12f, 12f), style = stroke)
+                    drawCircle(tint, 2.5f, Offset(12f, 12f), style = stroke)
+                    listOf(Offset(12f, 1f) to Offset(12f, 5f), Offset(12f, 19f) to Offset(12f, 23f),
+                        Offset(1f, 12f) to Offset(5f, 12f), Offset(19f, 12f) to Offset(23f, 12f)).forEach { (a, b) -> drawLine(tint, a, b, 1.65f) }
+                }
+                AppGlyph.More -> listOf(5f, 12f, 19f).forEach { drawCircle(tint, 1.4f, Offset(it, 12f)) }
+                AppGlyph.Back -> { path.moveTo(15f, 5f); path.lineTo(8f, 12f); path.lineTo(15f, 19f); drawPath(path, tint, style = stroke) }
+                AppGlyph.Arrow -> {
+                    path.moveTo(13f, 6f); path.lineTo(19f, 12f); path.lineTo(13f, 18f)
+                    drawPath(path, tint, style = stroke); drawLine(tint, Offset(5f, 12f), Offset(19f, 12f), 1.65f)
+                }
             }
         }
     }
